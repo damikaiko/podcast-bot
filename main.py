@@ -7,7 +7,6 @@ import asyncio
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
-# Intent設定
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
@@ -17,6 +16,8 @@ async def on_ready():
     print("Bot起動したよ")
 
 playing = set()
+
+FFMPEG_PATH = "./ffmpeg/ffmpeg"  # 同梱したffmpegバイナリ
 
 @bot.command()
 async def p(ctx, url: str):
@@ -40,7 +41,11 @@ async def p(ctx, url: str):
             vc = await ctx.author.voice.channel.connect()
 
         if not vc.is_playing():
-            vc.play(discord.FFmpegPCMAudio(audio_url))
+            FFMPEG_OPTIONS = {
+                'executable': FFMPEG_PATH,
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+            }
+            vc.play(discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS))
             await ctx.send("バキバキ童貞です")
         else:
             await ctx.send("既に再生中だよ")
