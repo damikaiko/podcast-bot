@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import discord
 from discord.ext import commands
 import subprocess
@@ -10,12 +11,12 @@ bot = commands.Bot(command_prefix="b!", intents=intents)
 
 @bot.event
 async def join():
-    print("ƒoƒLƒoƒL“¶’å‚Å‚·")
+    print("ãƒã‚­ãƒã‚­ç«¥è²ã§ã™")
 
 @bot.command()
 async def p(ctx, url: str):
     if not ctx.author.voice:
-        await ctx.send("VC‚É“ü‚Á‚Ä‚Ë")
+        await ctx.send("VCã«å…¥ã£ã¦ã­")
         return
 
     audio_url = subprocess.check_output(
@@ -24,6 +25,7 @@ async def p(ctx, url: str):
 
     vc = ctx.voice_client or await ctx.author.voice.channel.connect()
     vc.play(discord.FFmpegPCMAudio(audio_url))
-    await ctx.send("Ä¶‚·‚é‚æ")
+    await ctx.send("å†ç”Ÿã™ã‚‹ã‚ˆ")
 
 bot.run(TOKEN)
+
