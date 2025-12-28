@@ -7,7 +7,9 @@ import asyncio
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
+# Intent設定
 intents = discord.Intents.default()
+intents.message_content = True  # これを追加
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
 @bot.event
@@ -56,5 +58,15 @@ async def p(ctx, url: str):
 
     finally:
         playing.discard(ctx.channel.id)
+
+# 再生中止コマンド追加
+@bot.command()
+async def stop(ctx):
+    vc = ctx.voice_client
+    if vc and vc.is_playing():
+        vc.stop()
+        await ctx.send("再生を止めたよ")
+    else:
+        await ctx.send("再生中じゃないよ")
 
 bot.run(TOKEN)
