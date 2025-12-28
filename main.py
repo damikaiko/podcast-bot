@@ -9,14 +9,13 @@ TOKEN = os.environ["DISCORD_TOKEN"]
 
 # Intent設定
 intents = discord.Intents.default()
-intents.message_content = True  # これを追加
+intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
 @bot.event
 async def on_ready():
     print("Bot起動したよ")
 
-# 再生ロック用
 playing = set()
 
 @bot.command()
@@ -25,7 +24,6 @@ async def p(ctx, url: str):
         await ctx.send("VCに入ってね")
         return
 
-    # 再生中なら待たせる
     if ctx.channel.id in playing:
         await ctx.send("今は再生中だよ、少し待ってね")
         return
@@ -37,29 +35,23 @@ async def p(ctx, url: str):
             ["yt-dlp", "-g", "-f", "bestaudio", "--no-check-certificate", "--http-chunk-size", "10M", url]
         ).decode().strip()
 
-        # VC接続は既存VCを再利用
         vc = ctx.voice_client
         if not vc:
             vc = await ctx.author.voice.channel.connect()
 
-        # 再生
         if not vc.is_playing():
             vc.play(discord.FFmpegPCMAudio(audio_url))
             await ctx.send("バキバキ童貞です")
         else:
             await ctx.send("既に再生中だよ")
 
-        # 再生終了まで待機
         while vc.is_playing():
             await asyncio.sleep(1)
-
-        # 再生終了後少し待つ
-        await asyncio.sleep(2)  # 次の接続や再生まで少し間隔を空ける
+        await asyncio.sleep(2)
 
     finally:
         playing.discard(ctx.channel.id)
 
-# 再生中止コマンド追加
 @bot.command()
 async def stop(ctx):
     vc = ctx.voice_client
