@@ -4,11 +4,10 @@ from discord.ext import commands
 import subprocess
 import os
 import asyncio
-import sys
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 intents = discord.Intents.default()
-intents.message_content = True
+intents.message_content = True  # 最新 discord.py では必須
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
 # Render 上で自動的に ffmpeg を置くパス
@@ -16,20 +15,17 @@ FFMPEG_DIR = "./ffmpeg"
 FFMPEG_PATH = f"{FFMPEG_DIR}/ffmpeg"
 FFPROBE_PATH = f"{FFMPEG_DIR}/ffprobe"
 
-# ffmpeg がなければダウンロード
 def setup_ffmpeg():
     if not os.path.exists(FFMPEG_DIR):
         os.makedirs(FFMPEG_DIR)
     if not os.path.exists(FFMPEG_PATH):
         print("ffmpeg をダウンロード中...")
-        # Linux 64bit 静的ビルドを wget で取得
         subprocess.run([
             "wget",
             "-O", "ffmpeg.tar.xz",
             "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz"
         ], check=True)
         subprocess.run(["tar", "xJf", "ffmpeg.tar.xz"], check=True)
-        # バイナリをコピー
         extracted = [d for d in os.listdir(".") if d.startswith("ffmpeg-git") and os.path.isdir(d)][0]
         subprocess.run(["cp", f"{extracted}/ffmpeg", FFMPEG_PATH], check=True)
         subprocess.run(["cp", f"{extracted}/ffprobe", FFPROBE_PATH], check=True)
@@ -55,7 +51,6 @@ async def p(ctx, url: str):
 
     playing.add(ctx.channel.id)
     try:
-        # yt-dlp で音声 URL 取得
         audio_url = subprocess.check_output(
             ["yt-dlp", "-g", "-f", "bestaudio", "--no-check-certificate", "--http-chunk-size", "10M", url]
         ).decode().strip()
