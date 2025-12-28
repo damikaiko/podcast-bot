@@ -4,7 +4,7 @@ from discord.ext import commands
 import subprocess
 import os
 
-TOKEN = os.environ["MTQ1NDcwMjU4OTU1OTE4MTM4OQ.GIcyMy.hI9p0XCVwrzF99_a_6O2QQrkQmOiVJYcblQkFI"]
+TOKEN = os.environ["DISCORD_TOKEN"]
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="b!", intents=intents)
@@ -28,4 +28,5 @@ async def p(ctx, url: str):
     await ctx.send("再生するよ")
 
 bot.run(TOKEN)
+
 
