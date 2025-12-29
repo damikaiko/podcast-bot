@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
-# Render / Replit 上で自動的に ffmpeg を置くパス
+# ---------------- ffmpeg セットアップ ----------------
 FFMPEG_DIR = "./ffmpeg"
 FFMPEG_PATH = f"{FFMPEG_DIR}/ffmpeg"
 FFPROBE_PATH = f"{FFMPEG_DIR}/ffprobe"
@@ -39,6 +39,7 @@ def setup_ffmpeg():
 
 setup_ffmpeg()
 
+# ---------------- Discord BOT ----------------
 @bot.event
 async def on_ready():
     print("Bot 起動したよ")
@@ -65,8 +66,7 @@ async def p(ctx, url: str):
         if not vc.is_playing():
             opts = {
                 "executable": FFMPEG_PATH,
-                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-                "stderr": subprocess.DEVNULL  # ここで stderr をバイナリ安全に無視
+                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
             }
             vc.play(discord.FFmpegPCMAudio(audio_url, **opts))
             await ctx.send("再生するよ")
@@ -76,7 +76,6 @@ async def p(ctx, url: str):
         while vc.is_playing():
             await asyncio.sleep(1)
         await asyncio.sleep(2)
-
     finally:
         playing.discard(ctx.channel.id)
 
@@ -104,19 +103,21 @@ async def leave(ctx):
     else:
         await ctx.send("VCに接続してないよ")
 
-# ---------------- Flask 部分 ----------------
+# ---------------- Flask ----------------
 app = Flask("")
 
 @app.route("/")
 def home():
+    # 軽く OK を返すだけ
     return "OK", 200
 
 def run_flask():
-    # Replit / Render でも生存チェックに使いやすい
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    # PORT 環境変数があればそれを使う
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
-# 別スレッドで Flask を起動
-Thread(target=run_flask, daemon=True).start()
+# Flask を別スレッドで起動
+Thread(target=run_flask).start()
 
 # Discord BOT を起動
 bot.run(TOKEN)
