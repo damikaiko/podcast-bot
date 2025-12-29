@@ -15,7 +15,7 @@ bot = commands.Bot(command_prefix="b!", intents=intents)
 
 # 名前付きRSS
 RSS_LIST = {
-    "haruhi": "https://feeds.soundcloud.com/users/soundcloud:users:XXXXX/sounds.rss",
+    "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
 
 queues = {}  # guild_id: deque
@@ -121,3 +121,4 @@ async def leave(ctx):
         await ctx.send("抜けたよ")
 
 bot.run(TOKEN)
+
