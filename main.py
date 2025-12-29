@@ -4,13 +4,16 @@ from discord.ext import commands
 import subprocess
 import os
 import asyncio
+from threading import Thread
+from flask import Flask
 
 TOKEN = os.environ["DISCORD_TOKEN"]
+
 intents = discord.Intents.default()
-intents.message_content = True  # 最新 discord.py では必須
+intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
-# Render 上で自動的に ffmpeg を置くパス
+# Render / Replit 上で自動的に ffmpeg を置くパス
 FFMPEG_DIR = "./ffmpeg"
 FFMPEG_PATH = f"{FFMPEG_DIR}/ffmpeg"
 FFPROBE_PATH = f"{FFMPEG_DIR}/ffprobe"
@@ -21,12 +24,14 @@ def setup_ffmpeg():
     if not os.path.exists(FFMPEG_PATH):
         print("ffmpeg をダウンロード中...")
         subprocess.run([
-            "wget",
-            "-O", "ffmpeg.tar.xz",
+            "wget", "-O", "ffmpeg.tar.xz",
             "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz"
         ], check=True)
         subprocess.run(["tar", "xJf", "ffmpeg.tar.xz"], check=True)
-        extracted = [d for d in os.listdir(".") if d.startswith("ffmpeg-git") and os.path.isdir(d)][0]
+        extracted = [
+            d for d in os.listdir(".")
+            if d.startswith("ffmpeg-git") and os.path.isdir(d)
+        ][0]
         subprocess.run(["cp", f"{extracted}/ffmpeg", FFMPEG_PATH], check=True)
         subprocess.run(["cp", f"{extracted}/ffprobe", FFPROBE_PATH], check=True)
         subprocess.run(["chmod", "+x", FFMPEG_PATH, FFPROBE_PATH], check=True)
@@ -51,15 +56,17 @@ async def p(ctx, url: str):
 
     playing.add(ctx.channel.id)
     try:
-        audio_url = subprocess.check_output(
-            ["yt-dlp", "-g", "-f", "bestaudio", "--no-check-certificate", "--http-chunk-size", "10M", url]
-        ).decode().strip()
+        audio_url = subprocess.check_output([
+            "yt-dlp", "-g", "-f", "bestaudio", "--no-check-certificate",
+            "--http-chunk-size", "10M", url
+        ]).decode().strip()
 
         vc = ctx.voice_client or await ctx.author.voice.channel.connect()
         if not vc.is_playing():
             opts = {
                 "executable": FFMPEG_PATH,
-                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+                "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                "stderr": subprocess.DEVNULL  # ここで stderr をバイナリ安全に無視
             }
             vc.play(discord.FFmpegPCMAudio(audio_url, **opts))
             await ctx.send("再生するよ")
@@ -86,7 +93,7 @@ async def stop(ctx):
 @commands.is_owner()
 async def restart(ctx):
     await ctx.send("再起動するよ…")
-    await bot.close()  # Botを閉じるとRenderなどでは自動再起動される
+    await bot.close()
 
 @bot.command()
 async def leave(ctx):
@@ -97,5 +104,19 @@ async def leave(ctx):
     else:
         await ctx.send("VCに接続してないよ")
 
-bot.run(TOKEN)
+# ---------------- Flask 部分 ----------------
+app = Flask("")
 
+@app.route("/")
+def home():
+    return "OK", 200
+
+def run_flask():
+    # Replit / Render でも生存チェックに使いやすい
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+# 別スレッドで Flask を起動
+Thread(target=run_flask, daemon=True).start()
+
+# Discord BOT を起動
+bot.run(TOKEN)
