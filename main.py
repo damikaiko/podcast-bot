@@ -5,6 +5,7 @@ import subprocess
 import os
 import asyncio
 import feedparser
+from collections import deque
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
@@ -12,80 +13,111 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
-# 名前付きRSSだよ
+# 名前付きRSS
 RSS_LIST = {
-    "gera": "https://feeds.soundcloud.com/users/soundcloud:users:XXXXX/sounds.rss",
+    "haruhi": "https://feeds.soundcloud.com/users/soundcloud:users:XXXXX/sounds.rss",
 }
+
+queues = {}  # guild_id: deque
 
 @bot.event
 async def on_ready():
     print("起動したよ")
 
-playing = set()
+def get_entries(name):
+    feed = feedparser.parse(RSS_LIST[name])
+    return feed.entries
 
-def get_rss_audio(rss_url: str) -> str | None:
-    feed = feedparser.parse(rss_url)
-    if not feed.entries:
-        return None
-    entry = feed.entries[0]
+def get_audio_from_entry(entry):
     if "enclosures" in entry and entry.enclosures:
         return entry.enclosures[0].href
     return None
 
-@bot.command()
-async def list(ctx):
-    names = ", ".join(RSS_LIST.keys())
-    await ctx.send(f"登録RSS: {names}")
+async def play_next(ctx):
+    q = queues.get(ctx.guild.id)
+    if not q or not q:
+        return
 
-@bot.command()
-async def p(ctx, arg: str):
+    audio_url = q.popleft()
+    vc = ctx.voice_client
+    vc.play(discord.FFmpegPCMAudio(audio_url),
+            after=lambda e: asyncio.run_coroutine_threadsafe(
+                play_next(ctx), bot.loop))
+
+# 話数一覧
+@bot.command(name="ep")
+async def episodes(ctx, name: str):
+    if name not in RSS_LIST:
+        await ctx.send("知らないRSSだよ")
+        return
+
+    entries = get_entries(name)
+    msg = "\n".join([f"{i+1}. {e.title}" for i, e in enumerate(entries[:10])])
+    await ctx.send(msg)
+
+# 再生 / 追加
+@bot.command(name="p")
+async def play(ctx, name: str, num: int):
     if not ctx.author.voice:
-        await ctx.send("VCに入ってね")
+        await ctx.send("VC入ってね")
+        return
+    if name not in RSS_LIST:
+        await ctx.send("RSSないよ")
         return
 
-    if ctx.channel.id in playing:
-        await ctx.send("再生中だよ")
+    entries = get_entries(name)
+    if num < 1 or num > len(entries):
+        await ctx.send("番号違うよ")
         return
 
-    playing.add(ctx.channel.id)
-    try:
-        # 名前付きRSS
-        if arg in RSS_LIST:
-            audio_url = get_rss_audio(RSS_LIST[arg])
-            if not audio_url:
-                await ctx.send("RSS取得できなかったよ")
-                return
-        else:
-            # 通常URL
-            try:
-                audio_url = subprocess.check_output(
-                    ["yt-dlp", "-g", "-f", "bestaudio", arg],
-                    stderr=subprocess.DEVNULL
-                ).decode().strip()
-            except subprocess.CalledProcessError:
-                await ctx.send("URL失敗だよ")
-                return
+    audio_url = get_audio_from_entry(entries[num-1])
+    if not audio_url:
+        await ctx.send("音声取れないよ")
+        return
 
-        vc = ctx.voice_client or await ctx.author.voice.channel.connect()
-        vc.play(discord.FFmpegPCMAudio(audio_url))
+    q = queues.setdefault(ctx.guild.id, deque())
+    q.append(audio_url)
+
+    vc = ctx.voice_client or await ctx.author.voice.channel.connect()
+    if not vc.is_playing():
+        await play_next(ctx)
         await ctx.send("再生するよ")
+    else:
+        await ctx.send("キューに入れたよ")
 
-        while vc.is_playing():
-            await asyncio.sleep(1)
+# キュー表示
+@bot.command(name="q")
+async def queue(ctx):
+    q = queues.get(ctx.guild.id)
+    if not q:
+        await ctx.send("空だよ")
+        return
+    await ctx.send(f"{len(q)}件入ってるよ")
 
-    finally:
-        playing.discard(ctx.channel.id)
+# スキップ
+@bot.command(name="s")
+async def skip(ctx):
+    vc = ctx.voice_client
+    if vc and vc.is_playing():
+        vc.stop()
+        await ctx.send("飛ばすよ")
 
-@bot.command()
+# 停止
+@bot.command(name="st")
 async def stop(ctx):
-    if ctx.voice_client:
-        ctx.voice_client.stop()
+    vc = ctx.voice_client
+    if vc:
+        vc.stop()
+        queues[ctx.guild.id].clear()
         await ctx.send("止めたよ")
 
-@bot.command()
+# 退出
+@bot.command(name="l")
 async def leave(ctx):
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
+    vc = ctx.voice_client
+    if vc:
+        await vc.disconnect()
+        queues.pop(ctx.guild.id, None)
         await ctx.send("抜けたよ")
 
 bot.run(TOKEN)
