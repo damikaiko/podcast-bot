@@ -82,4 +82,20 @@ async def stop(ctx):
     else:
         await ctx.send("再生してないよ")
 
+@bot.command()
+@commands.is_owner()
+async def restart(ctx):
+    await ctx.send("再起動するよ…")
+    await bot.close()  # Botを閉じるとRenderなどでは自動再起動される
+
+@bot.command()
+async def leave(ctx):
+    vc = ctx.voice_client
+    if vc:
+        await vc.disconnect()
+        await ctx.send("VCから切断したよ")
+    else:
+        await ctx.send("VCに接続してないよ")
+
 bot.run(TOKEN)
+
