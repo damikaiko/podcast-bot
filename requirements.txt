@@ -1,8 +1,9 @@
 discord.py==2.6.4
+feedparser
+
 yt-dlp
 
-
-
+discord.py[voice]
 
 
 
