@@ -20,17 +20,13 @@ last_access_time = 0
 # メインスレッドのイベントループ
 main_loop = asyncio.get_event_loop()
 
-def start_bot_task():
-    global bot_task
-    if not bot_task or bot_task.done():
-        bot_task = asyncio.create_task(start_bot())
-
 @app.route("/")
 def home():
-    global last_access_time
+    global last_access_time, bot_task
     last_access_time = time.time()  # アクセス時刻更新
     if not bot_task or bot_task.done():
-        asyncio.run_coroutine_threadsafe(start_bot(), main_loop)
+        # メインループにBOT起動タスクを投げる
+        bot_task = asyncio.run_coroutine_threadsafe(start_bot(), main_loop)
     return "バキバキ童貞を起動したよ。", 200
 
 def run_flask():
@@ -88,7 +84,7 @@ async def play_random_next(ctx):
 @bot.command(name="r")
 async def random_play(ctx):
     global last_access_time
-    last_access_time = time.time()
+    last_access_time = time.time()  # タイマー更新
 
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
@@ -120,7 +116,7 @@ async def leave(ctx):
     if vc:
         await vc.disconnect()
         random_mode.discard(ctx.guild.id)
-        await ctx.send("VCから切断したよ。オフラインになるよ。")
+        await ctx.send("VCから切断したよ。いつの間にかオフラインになるよ。")
         await bot.close()
         global bot_task
         bot_task = None
@@ -135,7 +131,7 @@ async def on_voice_state_update(member, before, after):
         if len(humans) == 0:
             text_ch = discord.utils.get(member.guild.text_channels, name=vc.channel.name)
             if text_ch:
-                await text_ch.send("誰もいないから切断したよ。オフラインになるよ。")
+                await text_ch.send("誰もいないから切断したよ。いつの間にかオフラインになるよ。")
             await vc.disconnect()
             random_mode.discard(member.guild.id)
             await bot.close()
