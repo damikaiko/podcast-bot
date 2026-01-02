@@ -19,6 +19,9 @@ bot_task = None
 keep_alive_task = None
 last_access_time = 0
 
+# メインスレッドのイベントループ
+main_loop = asyncio.get_event_loop()
+
 def start_bot_task():
     global bot_task
     if not bot_task or bot_task.done():
@@ -28,9 +31,9 @@ def start_bot_task():
 def home():
     global last_access_time
     last_access_time = time.time()  # アクセス時刻更新
-    # メインスレッドのイベントループで BOT を安全に起動
-    loop = asyncio.get_event_loop_policy().get_event_loop()
-    loop.call_soon_threadsafe(start_bot_task)
+    if not bot_task or bot_task.done():
+        # メインループにタスクを投げる
+        asyncio.run_coroutine_threadsafe(start_bot(), main_loop)
     return "バキバキ童貞を起動したよ。", 200
 
 def run_flask():
@@ -179,6 +182,6 @@ Thread(target=auto_offline_check, daemon=True).start()
 # ---------------- メインスレッド ----------------
 if __name__ == "__main__":
     try:
-        asyncio.get_event_loop().run_forever()
+        main_loop.run_forever()
     except KeyboardInterrupt:
         pass
