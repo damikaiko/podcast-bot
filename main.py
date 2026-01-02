@@ -149,7 +149,7 @@ async def on_voice_state_update(member, before, after):
 
 # ---------------- Keep Alive ----------------
 def keep_alive():
-    url = os.environ.get("APP_URL")  # Render の自分のアプリURL
+    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render の自分のアプリURL
     while random_mode:  # ランダム再生中のみ動く
         try:
             if url:
@@ -157,3 +157,4 @@ def keep_alive():
         except Exception:
             pass
         time.sleep(60 * 5)  # 5分ごとにアクセス
+
