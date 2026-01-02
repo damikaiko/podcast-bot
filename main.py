@@ -6,6 +6,7 @@ import random
 from quart import Quart
 from discord.ext import commands
 import discord
+import ffmpeg_static  # 追加
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 AUTO_OFF_MINUTES = 10  # 放置で自動オフライン化する時間（分）
@@ -51,8 +52,9 @@ async def play_random_next(ctx):
     if not url:
         return
     if not vc.is_playing():
+        # ffmpeg-static を使うように変更
         vc.play(
-            discord.FFmpegPCMAudio(url),
+            discord.FFmpegPCMAudio(url, executable=ffmpeg_static.path),
             after=lambda e: asyncio.run_coroutine_threadsafe(
                 play_random_next(ctx), bot.loop
             )
