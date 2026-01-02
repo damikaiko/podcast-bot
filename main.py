@@ -23,16 +23,35 @@ random_mode = set()
 
 # ---------------- Flask ----------------
 app = Flask("")
+shutdown_task = None
 
 @app.route("/")
 def home():
-    return "OK", 200
+    global shutdown_task
+
+    # 既存の終了予約があればキャンセル
+    if shutdown_task:
+        shutdown_task.cancel()
+
+    # 10分後にBOT終了を予約
+    shutdown_task = asyncio.run_coroutine_threadsafe(
+        shutdown_after_10min(), bot.loop
+    )
+
+    return "BOT is online for 10 minutes", 200
+
+
+async def shutdown_after_10min():
+    await asyncio.sleep(600)
+    await bot.close()
+
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 Thread(target=run_flask).start()
+
 
 # ---------------- Discord BOT ----------------
 @bot.event
@@ -129,5 +148,6 @@ async def on_voice_state_update(member, before, after):
 
 
 bot.run(TOKEN)
+
 
 
