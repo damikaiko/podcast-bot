@@ -11,7 +11,7 @@ import time
 import urllib.request
 
 TOKEN = os.environ["DISCORD_TOKEN"]
-AUTO_OFF_MINUTES = 10  # 放置でオフラインにする時間（分）
+AUTO_OFF_MINUTES = 10  # 放置で自動オフライン化する時間（分）
 
 # ---------------- Flask ----------------
 app = Flask("")
@@ -28,8 +28,8 @@ def start_bot_task():
 def home():
     global last_access_time
     last_access_time = time.time()  # アクセス時刻更新
-    # メインループでBOTを起動
-    loop = asyncio.get_running_loop()
+    # メインスレッドのイベントループで BOT を安全に起動
+    loop = asyncio.get_event_loop_policy().get_event_loop()
     loop.call_soon_threadsafe(start_bot_task)
     return "バキバキ童貞を起動したよ。", 200
 
@@ -167,7 +167,6 @@ def auto_offline_check():
     while True:
         if bot_task and not bot_task.done():
             elapsed = time.time() - last_access_time
-            # ランダム再生してない状態で放置時間超過したらオフライン
             if elapsed > AUTO_OFF_MINUTES * 60 and not random_mode:
                 print("放置時間が経過したのでBOTをオフライン化します")
                 asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
