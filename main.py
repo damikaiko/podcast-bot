@@ -21,7 +21,10 @@ keep_alive_task = None
 @app.route("/")
 def home():
     global bot_task
-    loop = asyncio.get_event_loop()
+    # Flask スレッド用に新しいイベントループを作る
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     if not bot_task or bot_task.done():
         bot_task = loop.create_task(start_bot())
         return "バキバキ童貞を起動したよ。", 200
@@ -148,12 +151,12 @@ async def on_voice_state_update(member, before, after):
 
 # ---------------- Keep Alive ----------------
 def keep_alive():
-    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")
+    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render の自分のアプリURLを設定
     while random_mode:
         try:
             if url:
                 with urllib.request.urlopen(url) as response:
-                    response.read()  # アクセスだけ
+                    response.read()
         except Exception:
             pass
         time.sleep(60 * 5)  # 5分ごとにアクセス
