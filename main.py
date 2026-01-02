@@ -20,20 +20,7 @@ RSS_LIST = {
 }
 
 random_mode = set()
-
-# ---------------- Flask ----------------
-app = Flask("")
-
-@app.route("/")
-def home():
-    # Flask は即座に 200 を返す
-    return "バキバキ童貞が起動したよ。", 200
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-
-Thread(target=run_flask, daemon=True).start()
+bot_task = None  # BOT起動状態を保持
 
 # ---------------- Discord BOT ----------------
 @bot.event
@@ -62,14 +49,14 @@ async def play_random_next(ctx):
     if not url:
         return
 
-    vc.play(
-        discord.FFmpegPCMAudio(url),
-        after=lambda e: asyncio.run_coroutine_threadsafe(
-            play_random_next(ctx), bot.loop
+    if not vc.is_playing():
+        vc.play(
+            discord.FFmpegPCMAudio(url),
+            after=lambda e: asyncio.run_coroutine_threadsafe(
+                play_random_next(ctx), bot.loop
+            )
         )
-    )
 
-# ---------------- コマンド ----------------
 @bot.command(name="r")
 async def random_play(ctx):
     if not ctx.author.voice:
@@ -79,17 +66,13 @@ async def random_play(ctx):
     vc = ctx.voice_client
     try:
         if not vc:
-            # VC 接続をタイムアウト付きで試す
             vc = await ctx.author.voice.channel.connect(timeout=10)
     except asyncio.TimeoutError:
         await ctx.send("VCに接続できなかったよ。RenderだとVC接続できないことがある")
         return
 
     random_mode.add(ctx.guild.id)
-
-    if not vc.is_playing():
-        await play_random_next(ctx)
-
+    await play_random_next(ctx)
     await ctx.send("連続ランダム再生だよ")
 
 @bot.command(name="s")
@@ -105,11 +88,10 @@ async def leave(ctx):
     if vc:
         await vc.disconnect()
         random_mode.discard(ctx.guild.id)
-        # Render で BOT を安全終了させる
-        loop = asyncio.get_running_loop()
-        loop.call_soon_threadsafe(loop.stop)
+        await bot.close()
+        global bot_task
+        bot_task = None  # 再起動可能状態に戻す
 
-# ---------------- 自動VC監視 ----------------
 @bot.event
 async def on_voice_state_update(member, before, after):
     vc = member.guild.voice_client
@@ -119,19 +101,34 @@ async def on_voice_state_update(member, before, after):
     if before.channel == vc.channel and after.channel != vc.channel:
         humans = [m for m in vc.channel.members if not m.bot]
         if len(humans) == 0:
-            # VC と同名のテキストチャンネルに送信
             text_ch = discord.utils.get(
                 member.guild.text_channels,
                 name=vc.channel.name
             )
             if text_ch:
-                await text_ch.send(
-                    "誰もいないから切断したよ。オフラインになるよ。"
-                )
+                await text_ch.send("誰もいないから切断したよ。オフラインになるよ。")
             await vc.disconnect()
             random_mode.discard(member.guild.id)
-            # Render では直接 exit ではなくイベントループを止める
-            loop = asyncio.get_running_loop()
-            loop.call_soon_threadsafe(loop.stop)
+            await bot.close()
+            global bot_task
+            bot_task = None
 
-bot.run(TOKEN)
+# ---------------- Flask ----------------
+app = Flask("")
+
+@app.route("/")
+def home():
+    global bot_task
+    loop = asyncio.get_event_loop()
+
+    if not bot_task or bot_task.done():
+        # BOT 起動または再起動
+        bot_task = loop.create_task(bot.start(TOKEN))
+        return "BOTを起動したよ。", 200
+    return "BOTはすでに起動中だよ。", 200
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
+Thread(target=run_flask, daemon=True).start()
