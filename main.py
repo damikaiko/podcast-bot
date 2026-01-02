@@ -5,6 +5,7 @@ import os
 import asyncio
 import feedparser
 import random
+import sys
 from collections import deque
 from flask import Flask
 from threading import Thread
@@ -64,6 +65,17 @@ async def play_random_next(ctx):
         discord.FFmpegPCMAudio(audio_url),
         after=lambda e: asyncio.run_coroutine_threadsafe(
             play_random_next(ctx), bot.loop)
+
+async def on_voice_state_update(member, before, after):
+    vc = member.guild.voice_client
+    if not vc:
+        return
+
+    humans = [m for m in vc.channel.members if not m.bot]
+    if len(humans) == 0:
+        await vc.disconnect()
+        random_mode.discard(member.guild.id)
+        sys.exit(0)
     )
 
 # ---------------- コマンド ----------------
@@ -98,5 +110,6 @@ async def leave(ctx):
         await ctx.send("抜けたよ")
 
 bot.run(TOKEN)
+
 
 
