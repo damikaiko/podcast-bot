@@ -34,7 +34,7 @@ def home():
 
     # レスポンスは先に返す
     asyncio.run_coroutine_threadsafe(shutdown_after_10min(), bot_loop)
-    return "BOT is online for 10 minutes", 200
+    return "バキバキ童貞が起動したよ。", 200
 
 async def shutdown_after_10min():
     await asyncio.sleep(600)
@@ -132,3 +132,4 @@ async def on_voice_state_update(member, before, after):
             os._exit(0)
 
 bot.run(TOKEN)
+
