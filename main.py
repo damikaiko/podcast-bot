@@ -26,7 +26,6 @@ app = Flask("")
 
 @app.route("/")
 def home():
-    # Flask は即座に 200 を返す
     return "バキバキ童貞が接続されるよ。オンラインにならなかったり、コマンドに反応しない時は何度かアクセスして様子を見てね。", 200
 
 def run_flask():
@@ -39,6 +38,7 @@ Thread(target=run_flask, daemon=True).start()
 @bot.event
 async def on_ready():
     print("Bot 起動したよ")
+    await bot.change_presence(status=discord.Status.online)
 
 def get_audio_from_entry(entry):
     if entry.enclosures:
@@ -77,18 +77,16 @@ async def random_play(ctx):
         return
 
     vc = ctx.voice_client
-    try:
-        if not vc:
-            vc = await ctx.author.voice.channel.connect(timeout=10)
-    except asyncio.TimeoutError:
-        return
+    if not vc:
+        vc = await ctx.author.voice.channel.connect(timeout=10)
 
     random_mode.add(ctx.guild.id)
+    await bot.change_presence(status=discord.Status.online)
 
     if not vc.is_playing():
         await play_random_next(ctx)
 
-    await ctx.send("連続ランダム再生だよ")
+    await ctx.send("連続でランダムに再生するよ")
 
 @bot.command(name="s")
 async def skip(ctx):
@@ -104,6 +102,7 @@ async def leave(ctx):
         await vc.disconnect()
         random_mode.discard(ctx.guild.id)
     await ctx.send("切断したよ")
+    await bot.change_presence(status=discord.Status.offline)
 
 # ---------------- 自動VC監視 ----------------
 @bot.event
@@ -121,14 +120,10 @@ async def on_voice_state_update(member, before, after):
             )
             if text_ch:
                 await text_ch.send(
-                    "誰もいないから切断するよ。バキバキ童貞はオフラインになるよ。"
+                    "誰もいないから切断するよ。"
                 )
             await vc.disconnect()
             random_mode.discard(member.guild.id)
-            # BOTをオフラインに
             await bot.change_presence(status=discord.Status.offline)
 
-
 bot.run(TOKEN)
-
-
