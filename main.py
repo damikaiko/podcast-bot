@@ -8,7 +8,6 @@ import random
 from flask import Flask
 from threading import Thread
 import time
-import urllib.request
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 AUTO_OFF_MINUTES = 10  # 放置で自動オフライン化する時間（分）
@@ -16,7 +15,6 @@ AUTO_OFF_MINUTES = 10  # 放置で自動オフライン化する時間（分）
 # ---------------- Flask ----------------
 app = Flask("")
 bot_task = None
-keep_alive_task = None
 last_access_time = 0
 
 # メインスレッドのイベントループ
@@ -32,7 +30,6 @@ def home():
     global last_access_time
     last_access_time = time.time()  # アクセス時刻更新
     if not bot_task or bot_task.done():
-        # メインループにタスクを投げる
         asyncio.run_coroutine_threadsafe(start_bot(), main_loop)
     return "バキバキ童貞を起動したよ。", 200
 
@@ -91,7 +88,7 @@ async def play_random_next(ctx):
 @bot.command(name="r")
 async def random_play(ctx):
     global last_access_time
-    last_access_time = time.time()  # タイマー更新
+    last_access_time = time.time()
 
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
@@ -107,11 +104,6 @@ async def random_play(ctx):
     random_mode.add(ctx.guild.id)
     await play_random_next(ctx)
     await ctx.send("連続ランダム再生だよ")
-
-    global keep_alive_task
-    if not keep_alive_task:
-        keep_alive_task = Thread(target=keep_alive, daemon=True)
-        keep_alive_task.start()
 
 @bot.command(name="s")
 async def skip(ctx):
@@ -130,9 +122,8 @@ async def leave(ctx):
         random_mode.discard(ctx.guild.id)
         await ctx.send("VCから切断したよ。オフラインになるよ。")
         await bot.close()
-        global bot_task, keep_alive_task
+        global bot_task
         bot_task = None
-        keep_alive_task = None
 
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -148,33 +139,20 @@ async def on_voice_state_update(member, before, after):
             await vc.disconnect()
             random_mode.discard(member.guild.id)
             await bot.close()
-            global bot_task, keep_alive_task
+            global bot_task
             bot_task = None
-            keep_alive_task = None
-
-# ---------------- Keep Alive ----------------
-def keep_alive():
-    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render 自分のアプリURL
-    while random_mode:
-        try:
-            if url:
-                with urllib.request.urlopen(url) as response:
-                    response.read()
-        except Exception:
-            pass
-        time.sleep(60 * 5)
 
 # ---------------- 放置自動オフライン ----------------
 def auto_offline_check():
-    global bot_task, keep_alive_task
+    global bot_task
     while True:
         if bot_task and not bot_task.done():
             elapsed = time.time() - last_access_time
+            # VC再生中（random_mode にIDがある）はオフラインにならない
             if elapsed > AUTO_OFF_MINUTES * 60 and not random_mode:
                 print("放置時間が経過したのでBOTをオフライン化します")
                 asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
                 bot_task = None
-                keep_alive_task = None
         time.sleep(30)
 
 Thread(target=auto_offline_check, daemon=True).start()
