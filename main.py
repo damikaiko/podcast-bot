@@ -80,7 +80,7 @@ async def random_play(ctx):
     if not vc.is_playing():
         await play_random_next(ctx)
 
-    await ctx.send("1話ずつランダム再生だよ")
+    await ctx.send("連続ランダム再生だよ")
 
 @bot.command(name="s")
 async def skip(ctx):
@@ -88,14 +88,6 @@ async def skip(ctx):
     if vc and vc.is_playing():
         vc.stop()
         await ctx.send("飛ばすよ")
-
-@bot.command(name="st")
-async def stop(ctx):
-    vc = ctx.voice_client
-    if vc:
-        vc.stop()
-        random_mode.discard(ctx.guild.id)
-        await ctx.send("止めたよ")
 
 @bot.command(name="l")
 async def leave(ctx):
@@ -106,4 +98,5 @@ async def leave(ctx):
         await ctx.send("抜けたよ")
 
 bot.run(TOKEN)
+
 
