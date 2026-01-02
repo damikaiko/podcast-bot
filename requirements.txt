@@ -1,7 +1,8 @@
-discord.py
-feedparser
-quart
-ffmpeg-static
+discord.py==2.6.0
+quart==0.18.2
+feedparser==6.0.10
+ffmpeg-static==5.1.0
+PyNaCl==1.5.0
 
 
 
