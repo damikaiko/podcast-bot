@@ -111,7 +111,7 @@ async def on_voice_state_update(member, before, after):
         return
 
     humans = [m for m in vc.channel.members if not m.bot]
-    if len(humans) == 0:
+    if len(humans) == 1:
         text_ch = member.guild.system_channel
         if text_ch:
             await text_ch.send("誰もいないから切断したよ。放置でオフラインになるよ。")
@@ -123,3 +123,4 @@ async def on_voice_state_update(member, before, after):
 
 
 bot.run(TOKEN)
+
