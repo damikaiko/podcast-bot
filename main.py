@@ -19,16 +19,19 @@ bot_task = None
 keep_alive_task = None
 last_access_time = 0
 
+def start_bot_task():
+    global bot_task
+    if not bot_task or bot_task.done():
+        bot_task = asyncio.create_task(start_bot())
+
 @app.route("/")
 def home():
-    global bot_task, last_access_time
+    global last_access_time
     last_access_time = time.time()  # アクセス時刻更新
-
-    loop = asyncio.get_event_loop()
-    if not bot_task or bot_task.done():
-        bot_task = loop.create_task(start_bot())
-        return "バキバキ童貞を起動したよ。", 200
-    return "バキバキ童貞はすでに起動中だよ。", 200
+    # メインループでBOTを起動
+    loop = asyncio.get_running_loop()
+    loop.call_soon_threadsafe(start_bot_task)
+    return "バキバキ童貞を起動したよ。", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -41,6 +44,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
+
 RSS_LIST = {
     "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
@@ -84,7 +88,7 @@ async def play_random_next(ctx):
 @bot.command(name="r")
 async def random_play(ctx):
     global last_access_time
-    last_access_time = time.time()  # コマンドでもタイマー更新
+    last_access_time = time.time()  # タイマー更新
 
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
@@ -157,12 +161,13 @@ def keep_alive():
             pass
         time.sleep(60 * 5)
 
-# ---------------- 自動オフライン監視 ----------------
+# ---------------- 放置自動オフライン ----------------
 def auto_offline_check():
     global bot_task, keep_alive_task
     while True:
         if bot_task and not bot_task.done():
             elapsed = time.time() - last_access_time
+            # ランダム再生してない状態で放置時間超過したらオフライン
             if elapsed > AUTO_OFF_MINUTES * 60 and not random_mode:
                 print("放置時間が経過したのでBOTをオフライン化します")
                 asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
@@ -172,7 +177,7 @@ def auto_offline_check():
 
 Thread(target=auto_offline_check, daemon=True).start()
 
-# ---------------- メインスレッドを止める ----------------
+# ---------------- メインスレッド ----------------
 if __name__ == "__main__":
     try:
         asyncio.get_event_loop().run_forever()
