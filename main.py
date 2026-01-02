@@ -88,11 +88,16 @@ async def play_random_next(ctx):
     )
 
 # ---------------- コマンド ----------------
+# 追加：ギルドごとの送信先
+last_text_channel = {}
+
 @bot.command(name="r")
 async def random_play(ctx):
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
         return
+
+    last_text_channel[ctx.guild.id] = ctx.channel  # ← ここ重要
 
     vc = ctx.voice_client or await ctx.author.voice.channel.connect()
     random_mode.add(ctx.guild.id)
@@ -106,17 +111,20 @@ async def random_play(ctx):
 async def skip(ctx):
     vc = ctx.voice_client
     if vc and vc.is_playing():
+        last_text_channel[ctx.guild.id] = ctx.channel
         vc.stop()
         await ctx.send("飛ばすよ")
+
 
 @bot.command(name="l")
 async def leave(ctx):
     vc = ctx.voice_client
     if vc:
-        if ctx.guild.system_channel:
-            await ctx.guild.system_channel.send(
-                "切断したよ。放置でオフラインになるよ。"
-            )
+        last_text_channel[ctx.guild.id] = ctx.channel
+
+        ch = last_text_channel.get(ctx.guild.id)
+        if ch:
+            await ch.send("切断したよ。オフラインになるよ。")
 
         await vc.disconnect()
         random_mode.discard(ctx.guild.id)
@@ -138,7 +146,7 @@ async def on_voice_state_update(member, before, after):
         if len(humans) == 0:
             if member.guild.system_channel:
                 await member.guild.system_channel.send(
-                    "誰もいないから切断したよ。放置でオフラインになるよ。"
+                    "誰もいないから切断したよ。オフラインになるよ。"
                 )
 
             await vc.disconnect()
@@ -148,6 +156,7 @@ async def on_voice_state_update(member, before, after):
 
 
 bot.run(TOKEN)
+
 
 
 
