@@ -70,7 +70,7 @@ async def play_random_next(ctx):
     )
 
 # ---------------- コマンド ----------------
-@bot.command(name="r")
+@bot.command(name="p")
 async def random_play(ctx):
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
@@ -95,7 +95,7 @@ async def skip(ctx):
         vc.stop()
         await ctx.send("飛ばすよ")
 
-@bot.command(name="l")
+@bot.command(name="c")
 async def leave(ctx):
     vc = ctx.voice_client
     if vc:
@@ -127,3 +127,4 @@ async def on_voice_state_update(member, before, after):
             await bot.change_presence(status=discord.Status.offline)
 
 bot.run(TOKEN)
+
