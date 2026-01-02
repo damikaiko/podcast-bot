@@ -105,22 +105,29 @@ async def leave(ctx):
 
 
 # ---------------- 自動終了 ----------------
+@bot.event
 async def on_voice_state_update(member, before, after):
     vc = member.guild.voice_client
     if not vc:
         return
 
-    humans = [m for m in vc.channel.members if not m.bot]
-    if len(humans) == 1:
-        text_ch = member.guild.system_channel
-        if text_ch:
-            await text_ch.send("誰もいないから切断したよ。放置でオフラインになるよ。")
+    # BOTがいるVCから人が抜けた時だけ見る
+    if before.channel == vc.channel and after.channel != vc.channel:
+        humans = [m for m in vc.channel.members if not m.bot]
 
-        await vc.disconnect()
-        random_mode.discard(member.guild.id)
-        await asyncio.sleep(1)
-        await bot.close()
+        # 人間が0人になったら
+        if len(humans) == 0:
+            if member.guild.system_channel:
+                await member.guild.system_channel.send(
+                    "誰もいないから切断したよ。放置でオフラインになるよ。"
+                )
+
+            await vc.disconnect()
+            random_mode.discard(member.guild.id)
+            await asyncio.sleep(1)
+            await bot.close()
 
 
 bot.run(TOKEN)
+
 
