@@ -7,7 +7,6 @@ import feedparser
 import random
 from flask import Flask
 from threading import Thread
-import os
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
@@ -22,13 +21,24 @@ RSS_LIST = {
 
 random_mode = set()
 last_text_channel = {}
+bot_loop = None
 
 # ---------------- Flask ----------------
 app = Flask("")
 
 @app.route("/")
 def home():
-    return "バキバキ童貞だよ。", 200
+    global bot_loop
+    if bot_loop is None:
+        return "BOT not ready", 503
+
+    # レスポンスは先に返す
+    asyncio.run_coroutine_threadsafe(shutdown_after_10min(), bot_loop)
+    return "BOT is online for 10 minutes", 200
+
+async def shutdown_after_10min():
+    await asyncio.sleep(600)
+    os._exit(0)
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -39,6 +49,8 @@ Thread(target=run_flask, daemon=True).start()
 # ---------------- Discord BOT ----------------
 @bot.event
 async def on_ready():
+    global bot_loop
+    bot_loop = asyncio.get_running_loop()
     print("Bot 起動したよ")
 
 def get_audio_from_entry(entry):
@@ -54,7 +66,6 @@ def get_random_audio_url():
 async def play_random_next(ctx):
     if ctx.guild.id not in random_mode:
         return
-
     vc = ctx.voice_client
     if not vc:
         return
@@ -66,7 +77,7 @@ async def play_random_next(ctx):
     vc.play(
         discord.FFmpegPCMAudio(url),
         after=lambda e: asyncio.run_coroutine_threadsafe(
-            play_random_next(ctx), bot.loop
+            play_random_next(ctx), bot_loop
         )
     )
 
@@ -110,6 +121,7 @@ async def on_voice_state_update(member, before, after):
     if not vc:
         return
 
+    # BOTがいるVCから人が抜けたとき
     if before.channel == vc.channel and after.channel != vc.channel:
         humans = [m for m in vc.channel.members if not m.bot]
         if len(humans) == 0:
@@ -120,4 +132,3 @@ async def on_voice_state_update(member, before, after):
             os._exit(0)
 
 bot.run(TOKEN)
-
