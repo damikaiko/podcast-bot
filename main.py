@@ -101,7 +101,6 @@ async def leave(ctx):
         ch = last_text_channel.get(ctx.guild.id, ctx.channel)
         await ch.send("切断したよ。オフラインになるよ。")
         await vc.disconnect()
-        await bot.close()
         os._exit(0)
 
 # ---------------- 自動VC監視 ----------------
@@ -118,7 +117,7 @@ async def on_voice_state_update(member, before, after):
             if ch:
                 await ch.send("誰もいないから切断したよ。オフラインになるよ。")
             await vc.disconnect()
-            await bot.close()
             os._exit(0)
 
 bot.run(TOKEN)
+
