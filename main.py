@@ -8,7 +8,7 @@ import random
 from flask import Flask
 from threading import Thread
 import time
-import urllib.request  # 標準ライブラリでHTTPアクセス
+import urllib.request
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
@@ -21,11 +21,9 @@ keep_alive_task = None
 @app.route("/")
 def home():
     global bot_task
-    # Flask スレッド用に新しいイベントループを作る
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
+    loop = asyncio.get_event_loop()
     if not bot_task or bot_task.done():
+        # URLアクセス時だけBOTを起動
         bot_task = loop.create_task(start_bot())
         return "バキバキ童貞を起動したよ。", 200
     return "バキバキ童貞はすでに起動中だよ。", 200
@@ -72,11 +70,9 @@ async def play_random_next(ctx):
     vc = ctx.voice_client
     if not vc:
         return
-
     url = get_random_audio_url()
     if not url:
         return
-
     if not vc.is_playing():
         vc.play(
             discord.FFmpegPCMAudio(url),
@@ -90,7 +86,6 @@ async def random_play(ctx):
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
         return
-
     vc = ctx.voice_client
     try:
         if not vc:
@@ -98,7 +93,6 @@ async def random_play(ctx):
     except asyncio.TimeoutError:
         await ctx.send("VCに接続できなかったよ。再度コマンドを入力してね。")
         return
-
     random_mode.add(ctx.guild.id)
     await play_random_next(ctx)
     await ctx.send("連続ランダム再生だよ")
@@ -132,14 +126,10 @@ async def on_voice_state_update(member, before, after):
     vc = member.guild.voice_client
     if not vc:
         return
-
     if before.channel == vc.channel and after.channel != vc.channel:
         humans = [m for m in vc.channel.members if not m.bot]
         if len(humans) == 0:
-            text_ch = discord.utils.get(
-                member.guild.text_channels,
-                name=vc.channel.name
-            )
+            text_ch = discord.utils.get(member.guild.text_channels, name=vc.channel.name)
             if text_ch:
                 await text_ch.send("誰もいないから切断したよ。オフラインになるよ。")
             await vc.disconnect()
@@ -151,7 +141,7 @@ async def on_voice_state_update(member, before, after):
 
 # ---------------- Keep Alive ----------------
 def keep_alive():
-    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render の自分のアプリURLを設定
+    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render 自分のアプリURL
     while random_mode:
         try:
             if url:
@@ -159,7 +149,7 @@ def keep_alive():
                     response.read()
         except Exception:
             pass
-        time.sleep(60 * 5)  # 5分ごとにアクセス
+        time.sleep(60 * 5)
 
 # ---------------- メインスレッドを止める ----------------
 if __name__ == "__main__":
