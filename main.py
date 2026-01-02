@@ -11,19 +11,21 @@ import time
 import urllib.request
 
 TOKEN = os.environ["DISCORD_TOKEN"]
+AUTO_OFF_MINUTES = 10  # 放置でオフラインにする時間（分）
 
 # ---------------- Flask ----------------
 app = Flask("")
-
 bot_task = None
 keep_alive_task = None
+last_access_time = 0
 
 @app.route("/")
 def home():
-    global bot_task
+    global bot_task, last_access_time
+    last_access_time = time.time()  # アクセス時刻更新
+
     loop = asyncio.get_event_loop()
     if not bot_task or bot_task.done():
-        # URLアクセス時だけBOTを起動
         bot_task = loop.create_task(start_bot())
         return "バキバキ童貞を起動したよ。", 200
     return "バキバキ童貞はすでに起動中だよ。", 200
@@ -39,11 +41,9 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
-
 RSS_LIST = {
     "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
-
 random_mode = set()
 
 async def start_bot():
@@ -83,6 +83,9 @@ async def play_random_next(ctx):
 
 @bot.command(name="r")
 async def random_play(ctx):
+    global last_access_time
+    last_access_time = time.time()  # コマンドでもタイマー更新
+
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
         return
@@ -93,6 +96,7 @@ async def random_play(ctx):
     except asyncio.TimeoutError:
         await ctx.send("VCに接続できなかったよ。再度コマンドを入力してね。")
         return
+
     random_mode.add(ctx.guild.id)
     await play_random_next(ctx)
     await ctx.send("連続ランダム再生だよ")
@@ -104,6 +108,8 @@ async def random_play(ctx):
 
 @bot.command(name="s")
 async def skip(ctx):
+    global last_access_time
+    last_access_time = time.time()
     vc = ctx.voice_client
     if vc and vc.is_playing():
         vc.stop()
@@ -150,6 +156,21 @@ def keep_alive():
         except Exception:
             pass
         time.sleep(60 * 5)
+
+# ---------------- 自動オフライン監視 ----------------
+def auto_offline_check():
+    global bot_task, keep_alive_task
+    while True:
+        if bot_task and not bot_task.done():
+            elapsed = time.time() - last_access_time
+            if elapsed > AUTO_OFF_MINUTES * 60 and not random_mode:
+                print("放置時間が経過したのでBOTをオフライン化します")
+                asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
+                bot_task = None
+                keep_alive_task = None
+        time.sleep(30)
+
+Thread(target=auto_offline_check, daemon=True).start()
 
 # ---------------- メインスレッドを止める ----------------
 if __name__ == "__main__":
