@@ -68,7 +68,7 @@ async def random_play(ctx):
         if not vc:
             vc = await ctx.author.voice.channel.connect(timeout=10)
     except asyncio.TimeoutError:
-        await ctx.send("VCに接続できなかったよ。RenderだとVC接続できないことがある")
+        await ctx.send("VCに接続できなかったよ。一度切断して再度コマンドを入力してね。")
         return
 
     random_mode.add(ctx.guild.id)
@@ -124,11 +124,12 @@ def home():
     if not bot_task or bot_task.done():
         # BOT 起動または再起動
         bot_task = loop.create_task(bot.start(TOKEN))
-        return "BOTを起動したよ。", 200
-    return "BOTはすでに起動中だよ。", 200
+        return "バキバキ童貞を起動したよ。", 200
+    return "バキバキ童貞はすでに起動中だよ。", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
 Thread(target=run_flask, daemon=True).start()
+
