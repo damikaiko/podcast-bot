@@ -25,8 +25,8 @@ def home():
     global last_access_time, bot_task
     last_access_time = time.time()  # アクセス時刻更新
     if not bot_task or bot_task.done():
-        # メインループで安全にBOT起動タスク
-        bot_task = asyncio.run_coroutine_threadsafe(start_bot_safe(), main_loop)
+        # 既存ループ上で bot.start() を直接起動
+        bot_task = main_loop.create_task(bot.start(TOKEN))
     return "バキバキ童貞を起動したよ。", 200
 
 def run_flask():
@@ -45,11 +45,6 @@ RSS_LIST = {
     "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
 random_mode = set()
-
-async def start_bot_safe():
-    if not bot.is_ready():
-        await bot.login(TOKEN)
-        await bot.connect()
 
 @bot.event
 async def on_ready():
