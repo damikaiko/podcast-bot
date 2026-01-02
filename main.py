@@ -7,16 +7,16 @@ import feedparser
 import random
 from flask import Flask
 from threading import Thread
-import requests
 import time
+import urllib.request  # 標準ライブラリでHTTPアクセス
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
 # ---------------- Flask ----------------
 app = Flask("")
 
-bot_task = None  # BOT起動状態を保持
-keep_alive_task = None  # Keep Aliveスレッド制御
+bot_task = None
+keep_alive_task = None
 
 @app.route("/")
 def home():
@@ -100,7 +100,6 @@ async def random_play(ctx):
     await play_random_next(ctx)
     await ctx.send("連続ランダム再生だよ")
 
-    # ランダム再生中のみKeep Alive開始
     global keep_alive_task
     if not keep_alive_task:
         keep_alive_task = Thread(target=keep_alive, daemon=True)
@@ -149,12 +148,19 @@ async def on_voice_state_update(member, before, after):
 
 # ---------------- Keep Alive ----------------
 def keep_alive():
-    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")  # Render の自分のアプリURL
-    while random_mode:  # ランダム再生中のみ動く
+    url = os.environ.get("https://podcast-bot-o9ht.onrender.com")
+    while random_mode:
         try:
             if url:
-                requests.get(url)
+                with urllib.request.urlopen(url) as response:
+                    response.read()  # アクセスだけ
         except Exception:
             pass
         time.sleep(60 * 5)  # 5分ごとにアクセス
 
+# ---------------- メインスレッドを止める ----------------
+if __name__ == "__main__":
+    try:
+        asyncio.get_event_loop().run_forever()
+    except KeyboardInterrupt:
+        pass
