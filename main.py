@@ -5,8 +5,6 @@ import os
 import asyncio
 import feedparser
 import random
-import sys
-from collections import deque
 from flask import Flask
 from threading import Thread
 
@@ -14,14 +12,14 @@ TOKEN = os.environ["DISCORD_TOKEN"]
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.voice_states = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
 RSS_LIST = {
     "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
 
-queues = {}
-random_mode = set()  # guild_id 管理
+random_mode = set()
 
 # ---------------- Flask ----------------
 app = Flask("")
@@ -42,7 +40,7 @@ async def on_ready():
     print("Bot 起動したよ")
 
 def get_audio_from_entry(entry):
-    if "enclosures" in entry and entry.enclosures:
+    if entry.enclosures:
         return entry.enclosures[0].href
     return None
 
@@ -56,30 +54,21 @@ async def play_random_next(ctx):
     if ctx.guild.id not in random_mode:
         return
 
+    vc = ctx.voice_client
+    if not vc:
+        return
+
     audio_url = get_random_audio_url()
     if not audio_url:
         return
 
-    vc = ctx.voice_client
     vc.play(
         discord.FFmpegPCMAudio(audio_url),
         after=lambda e: asyncio.run_coroutine_threadsafe(
             play_random_next(ctx), bot.loop)
-
-async def on_voice_state_update(member, before, after):
-    vc = member.guild.voice_client
-    if not vc:
-        return
-
-    humans = [m for m in vc.channel.members if not m.bot]
-    if len(humans) == 0:
-        await vc.disconnect()
-        random_mode.discard(member.guild.id)
-        sys.exit(0)
     )
 
 # ---------------- コマンド ----------------
-
 @bot.command(name="r")
 async def random_play(ctx):
     if not ctx.author.voice:
@@ -105,11 +94,32 @@ async def skip(ctx):
 async def leave(ctx):
     vc = ctx.voice_client
     if vc:
+        if ctx.guild.system_channel:
+            await ctx.guild.system_channel.send(
+                "切断したよ。放置でオフラインになるよ。"
+            )
+
         await vc.disconnect()
         random_mode.discard(ctx.guild.id)
-        await ctx.send("抜けたよ")
+        await bot.close()
+
+
+# ---------------- 自動終了 ----------------
+async def on_voice_state_update(member, before, after):
+    vc = member.guild.voice_client
+    if not vc:
+        return
+
+    humans = [m for m in vc.channel.members if not m.bot]
+    if len(humans) == 0:
+        text_ch = member.guild.system_channel
+        if text_ch:
+            await text_ch.send("誰もいないから切断したよ。放置でオフラインになるよ。")
+
+        await vc.disconnect()
+        random_mode.discard(member.guild.id)
+        await asyncio.sleep(1)
+        await bot.close()
+
 
 bot.run(TOKEN)
-
-
-
