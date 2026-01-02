@@ -20,22 +20,27 @@ RSS_LIST = {
 }
 
 random_mode = set()
+last_text_channel = {}
+
+# ---- loop / shutdown 管理 ----
+bot_loop = None
+shutdown_task = None
 
 # ---------------- Flask ----------------
 app = Flask("")
-shutdown_task = None
 
 @app.route("/")
 def home():
     global shutdown_task
 
-    # 既存の終了予約があればキャンセル
+    if bot_loop is None:
+        return "BOT not ready", 503
+
     if shutdown_task:
         shutdown_task.cancel()
 
-    # 10分後にBOT終了を予約
     shutdown_task = asyncio.run_coroutine_threadsafe(
-        shutdown_after_10min(), bot.loop
+        shutdown_after_10min(), bot_loop
     )
 
     return "BOT is online for 10 minutes", 200
@@ -50,12 +55,13 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
-Thread(target=run_flask).start()
-
+Thread(target=run_flask, daemon=True).start()
 
 # ---------------- Discord BOT ----------------
 @bot.event
 async def on_ready():
+    global bot_loop
+    bot_loop = asyncio.get_running_loop()
     print("Bot 起動したよ")
 
 def get_audio_from_entry(entry):
@@ -84,20 +90,18 @@ async def play_random_next(ctx):
     vc.play(
         discord.FFmpegPCMAudio(audio_url),
         after=lambda e: asyncio.run_coroutine_threadsafe(
-            play_random_next(ctx), bot.loop)
+            play_random_next(ctx), bot_loop
+        )
     )
 
 # ---------------- コマンド ----------------
-# 追加：ギルドごとの送信先
-last_text_channel = {}
-
 @bot.command(name="r")
 async def random_play(ctx):
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
         return
 
-    last_text_channel[ctx.guild.id] = ctx.channel  # ← ここ重要
+    last_text_channel[ctx.guild.id] = ctx.channel
 
     vc = ctx.voice_client or await ctx.author.voice.channel.connect()
     random_mode.add(ctx.guild.id)
@@ -115,37 +119,41 @@ async def skip(ctx):
         vc.stop()
         await ctx.send("飛ばすよ")
 
-
 @bot.command(name="l")
 async def leave(ctx):
     vc = ctx.voice_client
-    if vc:
-        last_text_channel[ctx.guild.id] = ctx.channel
+    if not vc:
+        return
 
-        ch = last_text_channel.get(ctx.guild.id)
-        if ch:
-            await ch.send("切断したよ。オフラインになるよ。")
+    last_text_channel[ctx.guild.id] = ctx.channel
+    ch = last_text_channel.get(ctx.guild.id)
 
-        await vc.disconnect()
-        random_mode.discard(ctx.guild.id)
-        await bot.close()
+    if ch:
+        await ch.send("切断したよ。オフラインになるよ。")
 
+    await vc.disconnect()
+    random_mode.discard(ctx.guild.id)
+    await bot.close()
 
-# ---------------- 自動終了 ----------------
+# ---------------- 自動VC退出 ----------------
 @bot.event
 async def on_voice_state_update(member, before, after):
     vc = member.guild.voice_client
     if not vc:
         return
 
-    # BOTがいるVCから人が抜けた時だけ見る
     if before.channel == vc.channel and after.channel != vc.channel:
         humans = [m for m in vc.channel.members if not m.bot]
 
-        # 人間が0人になったら
         if len(humans) == 0:
-            if member.guild.system_channel:
-                await member.guild.system_channel.send(
+            # VCと同名のテキストチャンネルを探す
+            text_ch = discord.utils.get(
+                member.guild.text_channels,
+                name=vc.channel.name
+            )
+
+            if text_ch:
+                await text_ch.send(
                     "誰もいないから切断したよ。オフラインになるよ。"
                 )
 
@@ -156,7 +164,3 @@ async def on_voice_state_update(member, before, after):
 
 
 bot.run(TOKEN)
-
-
-
-
