@@ -1,7 +1,7 @@
 discord.py
-PyNaCl
 feedparser
-flask
+quart
+
 
 
 
