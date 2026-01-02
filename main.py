@@ -7,7 +7,7 @@ import feedparser
 import random
 from flask import Flask
 from threading import Thread
-import sys
+import os
 
 TOKEN = os.environ["DISCORD_TOKEN"]
 
@@ -25,28 +25,10 @@ last_text_channel = {}
 
 # ---------------- Flask ----------------
 app = Flask("")
-shutdown_task = None
-bot_loop = None
 
 @app.route("/")
 def home():
-    global shutdown_task
-    if bot_loop is None:
-        return "BOT not ready", 503
-
-    if shutdown_task:
-        shutdown_task.cancel()
-
-    shutdown_task = asyncio.run_coroutine_threadsafe(
-        shutdown_after_10min(), bot_loop
-    )
-    return "BOT is online for 10 minutes", 200
-
-
-async def shutdown_after_10min():
-    await asyncio.sleep(600)
-    os._exit(0)
-
+    return "バキバキ童貞だよ。", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -57,8 +39,6 @@ Thread(target=run_flask, daemon=True).start()
 # ---------------- Discord BOT ----------------
 @bot.event
 async def on_ready():
-    global bot_loop
-    bot_loop = asyncio.get_running_loop()
     print("Bot 起動したよ")
 
 def get_audio_from_entry(entry):
@@ -74,6 +54,7 @@ def get_random_audio_url():
 async def play_random_next(ctx):
     if ctx.guild.id not in random_mode:
         return
+
     vc = ctx.voice_client
     if not vc:
         return
@@ -120,6 +101,7 @@ async def leave(ctx):
         ch = last_text_channel.get(ctx.guild.id, ctx.channel)
         await ch.send("切断したよ。オフラインになるよ。")
         await vc.disconnect()
+        await bot.close()
         os._exit(0)
 
 # ---------------- 自動VC監視 ----------------
@@ -136,6 +118,7 @@ async def on_voice_state_update(member, before, after):
             if ch:
                 await ch.send("誰もいないから切断したよ。オフラインになるよ。")
             await vc.disconnect()
+            await bot.close()
             os._exit(0)
 
 bot.run(TOKEN)
