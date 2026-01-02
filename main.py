@@ -122,9 +122,13 @@ async def on_voice_state_update(member, before, after):
             )
             if text_ch:
                 await text_ch.send(
-                    "誰もいないから切断したよ。"
+                    "誰もいないから切断するよ。バキバキ童貞はオフラインになるよ。"
                 )
             await vc.disconnect()
             random_mode.discard(member.guild.id)
+            # BOTをオフラインに
+            await bot.change_presence(status=discord.Status.offline)
+
 
 bot.run(TOKEN)
+
