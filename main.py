@@ -15,12 +15,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="b!", intents=intents)
 
-# 名前付きRSS
 RSS_LIST = {
     "haruhi": "https://feeds.megaphone.fm/FNCOMMUNICATIONSINC3656403561",
 }
 
-queues = {}  # guild_id: deque
+queues = {}
+random_mode = set()  # guild_id 管理
 
 # ---------------- Flask ----------------
 app = Flask("")
@@ -40,113 +40,48 @@ Thread(target=run_flask).start()
 async def on_ready():
     print("Bot 起動したよ")
 
-def get_entries(name):
-    feed = feedparser.parse(RSS_LIST[name])
-    return feed.entries
-
 def get_audio_from_entry(entry):
     if "enclosures" in entry and entry.enclosures:
         return entry.enclosures[0].href
     return None
 
-def get_all_audio_urls():
-    urls = []
-    for feed_url in RSS_LIST.values():
-        feed = feedparser.parse(feed_url)
-        for entry in feed.entries:
-            audio = get_audio_from_entry(entry)
-            if audio:
-                urls.append(audio)
-    return urls
+def get_random_audio_url():
+    feed_url = random.choice(list(RSS_LIST.values()))
+    feed = feedparser.parse(feed_url)
+    entry = random.choice(feed.entries)
+    return get_audio_from_entry(entry)
 
-async def play_next(ctx):
-    q = queues.get(ctx.guild.id)
-    if not q:
+async def play_random_next(ctx):
+    if ctx.guild.id not in random_mode:
         return
 
-    audio_url = q.popleft()
+    audio_url = get_random_audio_url()
+    if not audio_url:
+        return
+
     vc = ctx.voice_client
     vc.play(
         discord.FFmpegPCMAudio(audio_url),
         after=lambda e: asyncio.run_coroutine_threadsafe(
-            play_next(ctx), bot.loop)
+            play_random_next(ctx), bot.loop)
     )
 
-# 話数一覧
-@bot.command(name="ep")
-async def episodes(ctx, name: str):
-    if name not in RSS_LIST:
-        await ctx.send("知らないRSSだよ")
-        return
+# ---------------- コマンド ----------------
 
-    entries = get_entries(name)
-    msg = "\n".join([f"{i+1}. {e.title}" for i, e in enumerate(entries[:10])])
-    await ctx.send(msg)
-
-# 再生 / 追加
-@bot.command(name="p")
-async def play(ctx, name: str, num: int):
-    if not ctx.author.voice:
-        await ctx.send("VC入ってね")
-        return
-    if name not in RSS_LIST:
-        await ctx.send("RSSないよ")
-        return
-
-    entries = get_entries(name)
-    if num < 1 or num > len(entries):
-        await ctx.send("番号違うよ")
-        return
-
-    audio_url = get_audio_from_entry(entries[num-1])
-    if not audio_url:
-        await ctx.send("音声取れないよ")
-        return
-
-    q = queues.setdefault(ctx.guild.id, deque())
-    q.append(audio_url)
-
-    vc = ctx.voice_client or await ctx.author.voice.channel.connect()
-    if not vc.is_playing():
-        await play_next(ctx)
-        await ctx.send("再生するよ")
-    else:
-        await ctx.send("キューに入れたよ")
-
-# ランダム連続再生
 @bot.command(name="r")
 async def random_play(ctx):
     if not ctx.author.voice:
         await ctx.send("VC入ってね")
         return
 
-    urls = get_all_audio_urls()
-    if not urls:
-        await ctx.send("音声ないよ")
-        return
-
-    random.shuffle(urls)
-
-    q = queues.setdefault(ctx.guild.id, deque())
-    q.clear()
-    q.extend(urls)
-
     vc = ctx.voice_client or await ctx.author.voice.channel.connect()
+    random_mode.add(ctx.guild.id)
+
     if not vc.is_playing():
-        await play_next(ctx)
+        await play_random_next(ctx)
 
-    await ctx.send("全部ランダム再生だよ")
+    await ctx.send("1話ずつランダム再生だよ")
 
-# キュー表示
-@bot.command(name="q")
-async def queue(ctx):
-    q = queues.get(ctx.guild.id)
-    if not q:
-        await ctx.send("空だよ")
-        return
-    await ctx.send(f"{len(q)}件入ってるよ")
-
-# スキップ
 @bot.command(name="s")
 async def skip(ctx):
     vc = ctx.voice_client
@@ -154,22 +89,21 @@ async def skip(ctx):
         vc.stop()
         await ctx.send("飛ばすよ")
 
-# 停止
 @bot.command(name="st")
 async def stop(ctx):
     vc = ctx.voice_client
     if vc:
         vc.stop()
-        queues[ctx.guild.id].clear()
+        random_mode.discard(ctx.guild.id)
         await ctx.send("止めたよ")
 
-# 退出
 @bot.command(name="l")
 async def leave(ctx):
     vc = ctx.voice_client
     if vc:
         await vc.disconnect()
-        queues.pop(ctx.guild.id, None)
+        random_mode.discard(ctx.guild.id)
         await ctx.send("抜けたよ")
 
 bot.run(TOKEN)
+
