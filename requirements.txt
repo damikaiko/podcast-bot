@@ -1,6 +1,8 @@
 discord.py
 feedparser
 quart
+ffmpeg-static
+
 
 
 
