@@ -27,7 +27,7 @@ app = Flask("")
 @app.route("/")
 def home():
     # Flask は即座に 200 を返す
-    return "バキバキ童貞が接続されるよ。オンラインにならなかったら何度かアクセスして様子を見てね。", 200
+    return "バキバキ童貞が接続されるよ。オンラインにならなかったり、コマンドに反応しない時は何度かアクセスして様子を見てね。", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -81,7 +81,6 @@ async def random_play(ctx):
         if not vc:
             vc = await ctx.author.voice.channel.connect(timeout=10)
     except asyncio.TimeoutError:
-        await ctx.send("VCに接続できなかったよ。オンラインになっている状態でコマンドを入力してね")
         return
 
     random_mode.add(ctx.guild.id)
@@ -131,4 +130,5 @@ async def on_voice_state_update(member, before, after):
 
 
 bot.run(TOKEN)
+
 
