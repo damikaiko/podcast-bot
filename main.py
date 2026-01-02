@@ -4,6 +4,7 @@ from discord.ext import commands
 import os
 import asyncio
 import feedparser
+import random
 from collections import deque
 from flask import Flask
 from threading import Thread
@@ -21,7 +22,7 @@ RSS_LIST = {
 
 queues = {}  # guild_id: deque
 
-# ---------------- Flask 部分 ----------------
+# ---------------- Flask ----------------
 app = Flask("")
 
 @app.route("/")
@@ -32,7 +33,7 @@ def run_flask():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
 
-Thread(target=run_flask).start()  # 別スレッドで起動
+Thread(target=run_flask).start()
 
 # ---------------- Discord BOT ----------------
 @bot.event
@@ -48,16 +49,28 @@ def get_audio_from_entry(entry):
         return entry.enclosures[0].href
     return None
 
+def get_all_audio_urls():
+    urls = []
+    for feed_url in RSS_LIST.values():
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries:
+            audio = get_audio_from_entry(entry)
+            if audio:
+                urls.append(audio)
+    return urls
+
 async def play_next(ctx):
     q = queues.get(ctx.guild.id)
-    if not q or not q:
+    if not q:
         return
 
     audio_url = q.popleft()
     vc = ctx.voice_client
-    vc.play(discord.FFmpegPCMAudio(audio_url),
-            after=lambda e: asyncio.run_coroutine_threadsafe(
-                play_next(ctx), bot.loop))
+    vc.play(
+        discord.FFmpegPCMAudio(audio_url),
+        after=lambda e: asyncio.run_coroutine_threadsafe(
+            play_next(ctx), bot.loop)
+    )
 
 # 話数一覧
 @bot.command(name="ep")
@@ -99,6 +112,30 @@ async def play(ctx, name: str, num: int):
         await ctx.send("再生するよ")
     else:
         await ctx.send("キューに入れたよ")
+
+# ランダム連続再生
+@bot.command(name="r")
+async def random_play(ctx):
+    if not ctx.author.voice:
+        await ctx.send("VC入ってね")
+        return
+
+    urls = get_all_audio_urls()
+    if not urls:
+        await ctx.send("音声ないよ")
+        return
+
+    random.shuffle(urls)
+
+    q = queues.setdefault(ctx.guild.id, deque())
+    q.clear()
+    q.extend(urls)
+
+    vc = ctx.voice_client or await ctx.author.voice.channel.connect()
+    if not vc.is_playing():
+        await play_next(ctx)
+
+    await ctx.send("全部ランダム再生だよ")
 
 # キュー表示
 @bot.command(name="q")
